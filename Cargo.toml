@@ -1,0 +1,10 @@
+[package]
+name = "typelayout"
+version = "0.1.0"
+authors = ["Jack Wrenn <me@jswrenn.com>"]
+edition = "2018"
+
+[dependencies]
+typenum = "1.10.0"
+frunk = "0.3.0"
+frunk_core = "0.3.0"
