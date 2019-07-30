@@ -5,15 +5,15 @@
 //!
 //! #[derive(Generic)]
 //! #[repr(C)]
-//! pub struct Tree {
-//!   height: u8,
-//!   age: u32,
+//! pub struct Struct {
+//!   first: u8,
+//!   second: u32,
 //! }
 //!
-//! unsafe impl ReprC for Tree {}
+//! unsafe impl ReprC for Struct {}
 //!
-//! assert_eq!(4, <Tree as Layout>::ALIGN);
-//! assert_eq!(8, <Tree as Layout>::SIZE);
+//! assert_eq!(4, <Struct as Layout>::ALIGN);
+//! assert_eq!(8, <Struct as Layout>::SIZE);
 //! ```
 pub extern crate typenum;
 pub extern crate frunk;

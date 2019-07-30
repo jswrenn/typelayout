@@ -4,38 +4,42 @@ use frunk::hlist::{HCons, HNil};
 use frunk_core::generic::Generic;
 
 /// ## Working Example
+/// This marker trait is implemented for structs iff it is `ReprC`, has no
+/// padding bytes, and all fields are also `FromZeros`:
 /// ```rust
 /// use typelayout::{ReprC, Generic, Layout, FromZeros};
 ///
 /// #[derive(Generic, Default, Debug, PartialEq)]
 /// #[repr(C)]
-/// pub struct Tree {
-///   height: u8,
-///   age: u8,
+/// pub struct Struct {
+///   first: u8,
+///   second: u8,
 /// }
 ///
-/// unsafe impl ReprC for Tree {}
+/// unsafe impl ReprC for Struct {}
 ///
-/// assert_eq!(<Tree as Default>::default(), <Tree as FromZeros>::zeroed());
+/// assert_eq!(<Struct as Default>::default(), <Struct as FromZeros>::zeroed());
 /// ```
 ///
 /// ## Failing Example
-/// This marker trait is not implemented if a type has padding.
+/// This marker trait is not implemented if a type has padding:
 /// ```compile_fail
 /// use typelayout::{ReprC, Generic, Layout, FromZeros};
 ///
 /// #[derive(Generic, Default, Debug, PartialEq)]
 /// #[repr(C)]
-/// pub struct Tree {
-///   height: u8,
-///   age: u16, // padding will be inserted between `height` and `age`
+/// pub struct Struct {
+///   first: u8,
+///   second: u16, // padding will be inserted between `first` and `second`
 /// }
 ///
-/// unsafe impl ReprC for Tree {}
+/// unsafe impl ReprC for Struct {}
 ///
-/// assert_eq!(<Tree as Default>::default(), <Tree as FromZeros>::zeroed());
+/// // `Struct` does not implement `FromZeros`, because it has a padding byte!
+/// assert_eq!(<Struct as Default>::default(), <Struct as FromZeros>::zeroed());
 /// ```
 pub unsafe trait FromZeros {
+  /// Initialize an instance of `Self` from zeroed bytes.
   #[inline(always)]
   fn zeroed() -> Self
   where Self: Sized,
@@ -67,20 +71,20 @@ unsafe impl FromZeros for usize {}
 unsafe impl FromZeros for f32   {}
 unsafe impl FromZeros for f64   {}
 
+/// A pub-in-priv wrapper type so we don't expose `FromZeros` implementations
+/// for arbitrary `HNil` and `HCons` instances.
+pub struct Struct<F>(F);
+
 unsafe impl<T: Generic + ReprC> FromZeros for T
 where
   T: NoPadding,
-  <Self as Generic>::Repr: FromZeros,
+  Struct<<Self as Generic>::Repr>: FromZeros,
 {}
 
-/// TODO: Create wrapper types around HNil and HCons, so this isn't public.
-#[doc(hidden)]
-unsafe impl FromZeros for HNil {}
+unsafe impl FromZeros for Struct<HNil> {}
 
-/// TODO: Create wrapper types around HNil and HCons, so this isn't public.
-#[doc(hidden)]
-unsafe impl<H, Tail> FromZeros for HCons<H, Tail>
+unsafe impl<H, Tail> FromZeros for Struct<HCons<H, Tail>>
 where
     H: FromZeros,
-    Tail: FromZeros,
+    Struct<Tail>: FromZeros,
 {}

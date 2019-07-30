@@ -1,13 +1,5 @@
 use crate::*;
 use frunk_core::generic::Generic;
-use core::marker::PhantomData;
-
-/// A generic representation of a struct + packing rule.
-#[allow(dead_code)]
-pub struct Struct<F, P> {
-  data: PhantomData<F>,
-  pack: PhantomData<P>,
-}
 
 impl<T: Generic + ReprC> Align<C> for T
 where
