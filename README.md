@@ -1,5 +1,7 @@
 # typelayout
 
+[**Documentation**](https://docs.rs/typelayout)
+
 **This is an experiment and a work-in-progress. The implementation of the `repr(C)` layout algorithm has not been thoroughly tested.**
 
 An experiment in embedding layout computations in the type system. This crate encodes the [layout algorithm for `repr(C)` structs](https://doc.rust-lang.org/reference/type-layout.html#reprc-structs) as a type-level computation, using [frunk](https://github.com/lloydmeta/frunk) to compute over the type structure of structs and [typenum](https://github.com/paholg/typenum) to perform the calculations. The `Layout` trait is implemented for types that know their own size at type-checking time. For instance:

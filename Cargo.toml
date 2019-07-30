@@ -2,6 +2,8 @@
 name = "typelayout"
 version = "0.1.0"
 authors = ["Jack Wrenn <me@jswrenn.com>"]
+license = "MIT"
+description = "type-level layout reflection"
 edition = "2018"
 
 [dependencies]
