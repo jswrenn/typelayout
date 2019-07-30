@@ -2,6 +2,7 @@
 //! ## Example
 //! ```rust
 //! use typelayout::{ReprC, Generic, Layout};
+//! use core::mem;
 //!
 //! #[derive(Generic)]
 //! #[repr(C)]
@@ -10,10 +11,11 @@
 //!   second: u32,
 //! }
 //!
+//! // `Layout` is only implemented for `Struct` if it is `ReprC`.
 //! unsafe impl ReprC for Struct {}
 //!
-//! assert_eq!(4, <Struct as Layout>::ALIGN);
-//! assert_eq!(8, <Struct as Layout>::SIZE);
+//! assert_eq!(mem::align_of::<Struct>(), Struct::ALIGN); // 4
+//! assert_eq!(mem::size_of::<Struct>(), Struct::SIZE);   // 8
 //! ```
 pub extern crate typenum;
 pub extern crate frunk;

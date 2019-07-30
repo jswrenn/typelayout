@@ -8,6 +8,7 @@ An experiment in embedding layout computations in the type system. This crate en
 
 ```rust
 use typelayout::{ReprC, Generic, Layout};
+use core::mem;
 
 #[derive(Generic)]
 #[repr(C)]
@@ -18,8 +19,8 @@ pub struct Struct {
 
 unsafe impl ReprC for Struct {}
 
-assert_eq!(4, <Struct as Layout>::ALIGN);
-assert_eq!(8, <Struct as Layout>::SIZE);
+assert_eq!(mem::align_of::<Struct>(), Struct::ALIGN); // 4
+assert_eq!(mem::size_of::<Struct>(), Struct::SIZE);   // 8
 ```
 
 ## Layout Invariants
