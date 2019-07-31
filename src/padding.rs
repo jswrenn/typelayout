@@ -23,6 +23,19 @@ where
 }
 
 /// Marker trait for types without any padding bytes.
+///
+/// Below, `Foo` does not implement `NoPadding`, because of trailing padding.
+/// ```rust
+/// use typelayout::{ReprC, Generic, NoPadding};
+///
+/// #[derive(Generic, Default)]
+/// #[repr(C)] struct Foo { a: i32, b: i16 }
+///
+/// unsafe impl ReprC for Foo {}
+///
+/// // Error!
+/// let _: &dyn NoPadding = &Foo::default() as &dyn NoPadding;
+/// ```
 pub unsafe trait NoPadding {}
 
 unsafe impl<T: Padding<Value=False>> NoPadding for T {}
