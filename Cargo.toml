@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Jack Wrenn <me@jswrenn.com>"]
 license = "MIT"
 description = "type-level layout reflection"
+repository = "https://github.com/jswrenn/typelayout"
+readme = "README.md"
 edition = "2018"
 
 [dependencies]
