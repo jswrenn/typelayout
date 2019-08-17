@@ -1,4 +1,3 @@
-//! Type-level layout information.
 //! ## Example
 //! ```rust
 //! use typelayout::{ReprC, Generic, Layout};
@@ -18,30 +17,33 @@
 //! assert_eq!(mem::size_of::<Struct>(), Struct::SIZE);   // 8
 //! ```
 pub extern crate typenum;
+#[macro_use]
 pub extern crate frunk;
 extern crate frunk_core;
 
-mod align;
-use crate::align::*;
-
-mod data;
+#[macro_use]
+extern crate static_assertions;
 
 mod layout;
-pub use crate::layout::Layout;
+use layout::*;
 
-mod packing;
-use crate::packing::*;
+mod frombytes;
+pub use frombytes::FromBytes;
 
-mod padding;
-pub use padding::NoPadding;
+pub use frunk::{Generic};
 
-mod size;
-use crate::size::*;
+pub unsafe trait Repr<R: ReprMarker>: LayoutAlgorithm<R> + TypeLayout {}
 
-pub use frunk::Generic;
+/// Use a `repr(C)` packing rule.
+pub struct C;
 
-mod fromzeros;
-pub use fromzeros::FromZeros;
+/// Use a `repr(packed)` packing rule.
+pub struct Packed;
 
-/// A marker trait for types that are ReprC
-pub unsafe trait ReprC {}
+/// Use a `repr(transparent)` packing rule.
+pub struct Transparent;
+
+pub trait ReprMarker {}
+impl ReprMarker for C {}
+impl ReprMarker for Packed {}
+impl ReprMarker for Transparent {}
