@@ -1,5 +1,6 @@
 use core::ops::*;
 use core::mem::*;
+use core::num::*;
 use typenum::*;
 use frunk::hlist::*;
 use crate::*;
@@ -66,6 +67,14 @@ impl Slot for Init {
   type Size = U1;
 }
 
+/// A non-zero byte of memory.
+pub type NonZero = core::num::NonZeroU8;
+impl Byte for NonZero {}
+
+impl Slot for NonZero {
+  type Size = U1;
+}
+
 /// A byte of possibly uninitialized memory.
 pub type Uninit = MaybeUninit<u8>;
 impl Byte for Uninit {}
@@ -117,16 +126,45 @@ macro_rules! primitive_layout {
 }
 
 primitive_layout! {
-  u8    { size: U1,   align: U1  };
-  u16   { size: U2,   align: U2  };
-  u32   { size: U4,   align: U4  };
-  u64   { size: U8,   align: U8  };
-  u128  { size: U16,  align: U16 };
-  i8    { size: U1,   align: U1  };
-  i16   { size: U2,   align: U2  };
-  i32   { size: U4,   align: U4  };
-  i64   { size: U8,   align: U8  };
-  i128  { size: U16,  align: U16 };
+  u8   { size: U1,   align: U1  };
+  u16  { size: U2,   align: U2  };
+  u32  { size: U4,   align: U4  };
+  u64  { size: U8,   align: U8  };
+  u128 { size: U16,  align: U16 };
+  i8   { size: U1,   align: U1  };
+  i16  { size: U2,   align: U2  };
+  i32  { size: U4,   align: U4  };
+  i64  { size: U8,   align: U8  };
+  i128 { size: U16,  align: U16 };
+}
+
+macro_rules! nonzero_layout {
+  ($($ty: ty { size: $size: ty, align: $align: ty };)*) => {
+    $(
+      unsafe impl<R> Repr<R> for $ty
+      where R: ReprMarker,
+            Self: LayoutAlgorithm<R>
+      {}
+
+      impl CLayout for $ty {
+        type Align = $align;
+        type Repr = <NonZero as Repeat<$size>>::Output;
+      }
+    )*
+  };
+}
+
+nonzero_layout! {
+  NonZeroU8    { size: U1,   align: U1  };
+  NonZeroU16   { size: U2,   align: U2  };
+  NonZeroU32   { size: U4,   align: U4  };
+  NonZeroU64   { size: U8,   align: U8  };
+  NonZeroU128  { size: U16,  align: U16 };
+  NonZeroI8    { size: U1,   align: U1  };
+  NonZeroI16   { size: U2,   align: U2  };
+  NonZeroI32   { size: U4,   align: U4  };
+  NonZeroI64   { size: U8,   align: U8  };
+  NonZeroI128  { size: U16,  align: U16 };
 }
 
 unsafe impl<'t, T> Repr<C> for &'t T {}
@@ -134,6 +172,11 @@ unsafe impl<'t, T> Repr<C> for &'t mut T {}
 unsafe impl<T> Repr<C> for *const T {}
 unsafe impl<T> Repr<C> for *mut T {}
 
+unsafe impl Repr<C> for usize {}
+unsafe impl Repr<C> for isize {}
+
+unsafe impl Repr<C> for NonZeroUsize {}
+unsafe impl Repr<C> for NonZeroIsize {}
 
 /// Compute the layout characteristics of a given type, for a given algorithm.
 pub trait LayoutAlgorithm<R> {
@@ -173,6 +216,26 @@ impl CLayout for isize
 {
   type Align = <usize as CLayout>::Align;
   type Repr = <usize as CLayout>::Repr;
+}
+
+impl CLayout for NonZeroUsize {
+  #[cfg(target_pointer_width = "32")]
+  type Align = U4;
+
+  #[cfg(target_pointer_width = "64")]
+  type Align = U8;
+
+  #[cfg(target_pointer_width = "32")]
+  type Repr = <NonZero as Repeat<U4>>::Output;
+
+  #[cfg(target_pointer_width = "64")]
+  type Repr = <NonZero as Repeat<U8>>::Output;
+}
+
+impl CLayout for NonZeroIsize
+{
+  type Align = <NonZeroUsize as CLayout>::Align;
+  type Repr = <NonZeroUsize as CLayout>::Repr;
 }
 
 impl<'t, T> CLayout for &'t T

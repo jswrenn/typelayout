@@ -5,6 +5,8 @@ use frunk::hlist::HNil;
 /// A valid instance of `T` is also a valid instance of `Self`
 ///
 /// ```rust
+/// use typelayout::*;
+///
 /// #[derive(Generic)]
 /// #[repr(C)]
 /// struct Struct1 {
@@ -22,7 +24,7 @@ use frunk::hlist::HNil;
 /// unsafe impl Repr<C> for Struct2 {}
 ///
 /// fn from_bytes<T, U>()
-/// where T: FromBytes<U>{}
+/// where U: FromBytes<T>{}
 ///
 /// from_bytes::<
 ///     Struct1,
@@ -83,6 +85,32 @@ assert_impl_all!(
 // An initialized byte may not be constructed from an uninitialized byte.
 assert_not_impl_any!(
   Hlist![Init],
+  FromLayout<Hlist![Uninit]>);
+
+///  `NonZero -> *`
+impl<
+      TR,
+  U1, UR,
+>
+FromLayout<
+  Hlist![NonZero, ...TR]
+>
+for
+  Hlist![U1, ...UR]
+where
+  U1: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+// An nonzero byte may only be constructed from another initialized byte.
+assert_impl_all!(
+  Hlist![NonZero],
+  FromLayout<Hlist![NonZero]>);
+
+// An nonzero byte may not be constructed from an initialized or uninitialized byte.
+assert_not_impl_any!(
+  Hlist![NonZero],
+  FromLayout<Hlist![Init]>,
   FromLayout<Hlist![Uninit]>);
 
 /// `Uninit -> *`
@@ -253,91 +281,19 @@ assert_not_impl_any!(
   Hlist![&'static mut u64],
   FromLayout<Hlist![*const u64]>);
 
-macro_rules! decompose_ptr{
-  ($ty: ty) => {
-    #[cfg(target_pointer_width = "32")]
-    impl<'t,
-      T, TR,
-      U2, U3, U4, UR>
-    FromLayout<
-      Hlist![$ty, ...TR]
-    >
-    for
-      Hlist![Init, U2, U3, U4, ...UR]
-    where
-      U2: FromSlot<Init>,
-      U3: FromSlot<Init>,
-      U4: FromSlot<Init>,
-      UR: FromLayout<TR>,
-    {}
-
-    #[cfg(target_pointer_width = "32")]
-    impl<'t,
-      T, TR,
-      U2, U3, U4, UR>
-    FromLayout<
-      Hlist![$ty, ...TR]
-    >
-    for
-      Hlist![Uninit, U2, U3, U4, ...UR]
-    where
-      U2: FromSlot<Init>,
-      U3: FromSlot<Init>,
-      U4: FromSlot<Init>,
-      UR: FromLayout<TR>,
-    {}
-
-    #[cfg(target_pointer_width = "64")]
-    impl<'t,
-      T, TR,
-      U2, U3, U4, U5, U6, U7, U8, UR>
-    FromLayout<
-      Hlist![$ty, ...TR]
-    >
-    for
-      Hlist![Init, U2, U3, U4, U5, U6, U7, U8, ...UR]
-    where
-      U2: FromSlot<Init>,
-      U3: FromSlot<Init>,
-      U4: FromSlot<Init>,
-      U5: FromSlot<Init>,
-      U6: FromSlot<Init>,
-      U7: FromSlot<Init>,
-      U8: FromSlot<Init>,
-      UR: FromLayout<TR>,
-    {}
-
-    #[cfg(target_pointer_width = "64")]
-    impl<'t,
-      T, TR,
-      U2, U3, U4, U5, U6, U7, U8, UR>
-    FromLayout<
-      Hlist![$ty, ...TR]
-    >
-    for
-      Hlist![Uninit, U2, U3, U4, U5, U6, U7, U8, ...UR]
-    where
-      U2: FromSlot<Init>,
-      U3: FromSlot<Init>,
-      U4: FromSlot<Init>,
-      U5: FromSlot<Init>,
-      U6: FromSlot<Init>,
-      U7: FromSlot<Init>,
-      U8: FromSlot<Init>,
-      UR: FromLayout<TR>,
-    {}
-  };
-}
-
-decompose_ptr!(*const T);
-decompose_ptr!(*mut T);
-decompose_ptr!(&'t T);
-decompose_ptr!(&'t mut T);
+////////////////////////////////////////////////////////////////////////////////
+// Pointer Decompositions
+////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(target_pointer_width = "32")]
 type InitializedBytes<R=HNil> = Hlist![Init, Init, Init, Init, ...R];
 #[cfg(target_pointer_width = "64")]
 type InitializedBytes<R=HNil> = Hlist![Init, Init, Init, Init, Init, Init, Init, Init, ...R];
+
+#[cfg(target_pointer_width = "32")]
+type NonZeroBytes<R=HNil> = Hlist![NonZero, NonZero, NonZero, NonZero, ...R];
+#[cfg(target_pointer_width = "64")]
+type NonZeroBytes<R=HNil> = Hlist![NonZero, NonZero, NonZero, NonZero, NonZero, NonZero, NonZero, NonZero, ...R];
 
 #[cfg(target_pointer_width = "32")]
 type UninitializedBytes<R=HNil> = Hlist![Uninit, Uninit, Uninit, Uninit, ...R];
@@ -360,6 +316,414 @@ assert_impl_all!(
   FromLayout<Hlist![&'static u64]>,
   FromLayout<Hlist![&'static mut u64]>);
 
+// smart pointers may be decomposed into nonzero bytes
+assert_impl_all!(
+  NonZeroBytes,
+  FromLayout<Hlist![&'static u64]>,
+  FromLayout<Hlist![&'static mut u64]>);
+
+// raw pointers may NOT be decomposed into nonzero bytes
+assert_not_impl_any!(
+  NonZeroBytes,
+  FromLayout<Hlist![*const u64]>,
+  FromLayout<Hlist![*mut u64]>);
+
+////////////////////////////////////////////////////////////////////////////////
+// Smart Pointer Decomposition
+////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(target_pointer_width = "32")]
+/// &'t T -> `[Init; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![&'t T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// &'t T -> `[NonZero; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![&'t T, ...TR]
+>
+for
+  Hlist![NonZero, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// &'t T -> `[Uninit; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![&'t T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// &'t mut T -> `[Init; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![&'t mut T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// &'t mut T -> `[NonZero; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![&'t mut T, ...TR]
+>
+for
+  Hlist![NonZero, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// &'t mut T -> `[Uninit; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![&'t mut T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+///////////////////////////// 64 ///////////////////////////////////////////////
+
+#[cfg(target_pointer_width = "64")]
+/// &'t T -> `[Init; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![&'t T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  U5: FromSlot<NonZero>,
+  U6: FromSlot<NonZero>,
+  U7: FromSlot<NonZero>,
+  U8: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// &'t T -> `[NonZero; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![&'t T, ...TR]
+>
+for
+  Hlist![NonZero, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  U5: FromSlot<NonZero>,
+  U6: FromSlot<NonZero>,
+  U7: FromSlot<NonZero>,
+  U8: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// &'t T -> `[Uninit; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![&'t T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  U5: FromSlot<NonZero>,
+  U6: FromSlot<NonZero>,
+  U7: FromSlot<NonZero>,
+  U8: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// &'t mut T -> `[Init; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![&'t mut T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  U5: FromSlot<NonZero>,
+  U6: FromSlot<NonZero>,
+  U7: FromSlot<NonZero>,
+  U8: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// &'t mut T -> `[NonZero; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![&'t mut T, ...TR]
+>
+for
+  Hlist![NonZero, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  U5: FromSlot<NonZero>,
+  U6: FromSlot<NonZero>,
+  U7: FromSlot<NonZero>,
+  U8: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// &'t mut T -> `[Uninit; target_pointer_width]`
+impl<'t,
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![&'t mut T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<NonZero>,
+  U3: FromSlot<NonZero>,
+  U4: FromSlot<NonZero>,
+  U5: FromSlot<NonZero>,
+  U6: FromSlot<NonZero>,
+  U7: FromSlot<NonZero>,
+  U8: FromSlot<NonZero>,
+  UR: FromLayout<TR>,
+{}
+
+////////////////////////////////////////////////////////////////////////////////
+// Raw Pointer Decompositions
+////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(target_pointer_width = "32")]
+/// *const T -> `[Init; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![*const T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// *const T -> `[Uninit; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![*const T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// *mut T -> `[Init; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![*mut T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "32")]
+/// *mut T -> `[Uninit; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, UR>
+FromLayout<
+  Hlist![*mut T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+///////////////////////////// 64 ///////////////////////////////////////////////
+
+#[cfg(target_pointer_width = "64")]
+/// *const T -> `[Init; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![*const T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  U5: FromSlot<Init>,
+  U6: FromSlot<Init>,
+  U7: FromSlot<Init>,
+  U8: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// *const T -> `[Uninit; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![*const T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  U5: FromSlot<Init>,
+  U6: FromSlot<Init>,
+  U7: FromSlot<Init>,
+  U8: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// *mut T -> `[Init; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![*mut T, ...TR]
+>
+for
+  Hlist![Init, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  U5: FromSlot<Init>,
+  U6: FromSlot<Init>,
+  U7: FromSlot<Init>,
+  U8: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+#[cfg(target_pointer_width = "64")]
+/// *mut T -> `[Uninit; target_pointer_width]`
+impl<
+  T, TR,
+  U2, U3, U4, U5, U6, U7, U8, UR>
+FromLayout<
+  Hlist![*mut T, ...TR]
+>
+for
+  Hlist![Uninit, U2, U3, U4, U5, U6, U7, U8, ...UR]
+where
+  U2: FromSlot<Init>,
+  U3: FromSlot<Init>,
+  U4: FromSlot<Init>,
+  U5: FromSlot<Init>,
+  U6: FromSlot<Init>,
+  U7: FromSlot<Init>,
+  U8: FromSlot<Init>,
+  UR: FromLayout<TR>,
+{}
+
+////////////////////////////////////////////////////////////////////////////////
+// Pointer Recompositions
+////////////////////////////////////////////////////////////////////////////////
+
 /// `[Init; target_pointer_width] -> *const U`
 impl<
   TR,
@@ -369,19 +733,6 @@ FromLayout<
 >
 for
   Hlist![*const U1, ...UR]
-where
-  UR: FromLayout<TR>,
-{}
-
-/// `[Init; target_pointer_width] -> *mut U`
-impl<
-  TR,
-  U1, UR>
-FromLayout<
-  InitializedBytes<TR>
->
-for
-  Hlist![*mut U1, ...UR]
 where
   UR: FromLayout<TR>,
 {}
@@ -398,12 +749,52 @@ assert_not_impl_any!(
   Hlist![*const u64],
   FromLayout<UninitializedBytes>);
 
+/// `[Init; target_pointer_width] -> *mut U`
+impl<
+  TR,
+  U1, UR>
+FromLayout<
+  InitializedBytes<TR>
+>
+for
+  Hlist![*mut U1, ...UR]
+where
+  UR: FromLayout<TR>,
+{}
+
+// mut ptr may be created from initialized bytes
+#[cfg(target_pointer_width = "64")]
+assert_impl_all!(
+  Hlist![*mut u64],
+  FromLayout<InitializedBytes>);
+
+// mut ptr may NOT be created from uninitialized bytes
+#[cfg(target_pointer_width = "64")]
+assert_not_impl_any!(
+  Hlist![*mut u64],
+  FromLayout<UninitializedBytes>);
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
 /// A valid instance of `T` is also a valid instance of `Self` 
 pub trait FromSlot<T>
 {}
 
 /// An initialized byte is a valid instance of an initialized byte.
 impl FromSlot<Init>   for Init    {}
+
+/// An nonzero byte is a valid instance of nonzero byte.
+impl FromSlot<NonZero>   for NonZero {}
+
+/// An nonzero byte is a valid instance of an initialized byte.
+impl FromSlot<NonZero>   for Init    {}
+
+/// An nonzero byte is a valid instance of an uninitialized byte.
+impl FromSlot<NonZero>   for Uninit  {}
 
 /// An uninitialized byte is a valid instance of an uninitialized byte.
 impl FromSlot<Uninit> for Uninit  {}

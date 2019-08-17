@@ -1,6 +1,6 @@
 //! ## Example
 //! ```rust
-//! use typelayout::{ReprC, Generic, Layout};
+//! use typelayout::*;
 //! use core::mem;
 //!
 //! #[derive(Generic)]
@@ -11,7 +11,7 @@
 //! }
 //!
 //! // `Layout` is only implemented for `Struct` if it is `ReprC`.
-//! unsafe impl ReprC for Struct {}
+//! unsafe impl Repr<C> for Struct {}
 //!
 //! assert_eq!(mem::align_of::<Struct>(), Struct::ALIGN); // 4
 //! assert_eq!(mem::size_of::<Struct>(), Struct::SIZE);   // 8
