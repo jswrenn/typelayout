@@ -167,22 +167,32 @@ nonzero_layout! {
   NonZeroI128  { size: U16,  align: U16 };
 }
 
-unsafe impl<'t, T> Repr<C> for &'t T {}
-unsafe impl<'t, T> Repr<C> for &'t mut T {}
-unsafe impl<T> Repr<C> for *const T {}
-unsafe impl<T> Repr<C> for *mut T {}
+unsafe impl<'t, T, R> Repr<R> for &'t T
+where R: ReprMarker, Self: LayoutAlgorithm<R> {}
+unsafe impl<'t, T, R> Repr<R> for &'t mut T
+where R: ReprMarker, Self: LayoutAlgorithm<R> {}
+unsafe impl<R, T> Repr<R> for *const T
+where R: ReprMarker, Self: LayoutAlgorithm<R> {}
+unsafe impl<R, T> Repr<R> for *mut T
+where R: ReprMarker, Self: LayoutAlgorithm<R> {}
 
-unsafe impl Repr<C> for usize {}
-unsafe impl Repr<C> for isize {}
+unsafe impl<R: ReprMarker> Repr<R> for usize
+where Self: LayoutAlgorithm<R> {}
+unsafe impl<R: ReprMarker> Repr<R> for isize
+where Self: LayoutAlgorithm<R> {}
 
-unsafe impl Repr<C> for NonZeroUsize {}
-unsafe impl Repr<C> for NonZeroIsize {}
+unsafe impl<R: ReprMarker> Repr<R> for NonZeroUsize
+where Self: LayoutAlgorithm<R>
+{}
+unsafe impl<R: ReprMarker> Repr<R> for NonZeroIsize
+where Self: LayoutAlgorithm<R>
+{}
 
 /// Compute the layout characteristics of a given type, for a given algorithm.
 pub trait LayoutAlgorithm<R> {
   type Align: Unsigned;
   /// The layout of this struct.
-  type Repr;
+  type Repr: Representation;
 }
 
 impl<T: Generic> LayoutAlgorithm<C> for T

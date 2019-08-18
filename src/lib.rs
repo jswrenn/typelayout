@@ -1,21 +1,3 @@
-//! ## Example
-//! ```rust
-//! use typelayout::*;
-//! use core::mem;
-//!
-//! #[derive(Generic)]
-//! #[repr(C)]
-//! pub struct Struct {
-//!   first: u8,
-//!   second: u32,
-//! }
-//!
-//! // `Layout` is only implemented for `Struct` if it is `ReprC`.
-//! unsafe impl Repr<C> for Struct {}
-//!
-//! assert_eq!(mem::align_of::<Struct>(), Struct::ALIGN); // 4
-//! assert_eq!(mem::size_of::<Struct>(), Struct::SIZE);   // 8
-//! ```
 pub extern crate typenum;
 #[macro_use]
 pub extern crate frunk;
@@ -29,6 +11,9 @@ use layout::*;
 
 mod frombytes;
 pub use frombytes::FromBytes;
+
+mod alignedto;
+pub use alignedto::AlignedTo;
 
 pub use frunk::{Generic};
 
